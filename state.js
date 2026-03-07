@@ -1,13 +1,46 @@
-import { createMachine, assign, createActor } from 'xstate';
-// https://stately.ai/docs/machines
-// add event keypress mapper
 
-const stateMachine = createMachine({
-    id: 'vim',
-    initial: 'normal',
-    states:{
-        normal:{
-            on:{
+// add event keypress mapper
+const states ={
+    INSERT: 'Insert',
+    VISUAL: 'Visual',
+    NORMAL: 'Normal'
+}
+
+class stateMachine {
+    // initialize in normal mode, key buffer is user's key combinations
+    constructor(){
+        this.mode = states.Normal;
+        this.keyBuffer = '';
+    }
+
+    handleKey(event){
+        const key = event.key;
+        if(key==='Escape'){
+            this.transitionTo(states.Normal);
+            this.clearBuffer();
+            return;
+        }
+    }
+    transitionTo(newMode){
+        if(this.mode!== newMode){
+            this.mode = newMode;
+            this.clearBuffer();
+
+            // TBA: UI should change here
+        }
+    }
+    clearBuffer() {
+        this.keyBuffer = '';
+    }
+}
+
+const vim = new stateMachine();
+
+window.addEventListener('keydown', (e)=> {
+    // ignore key modifiers
+    if(e.key==='Shift'||e.key==='Control'||e.key==='Alt') return;
+    vim.handleKey(e);
+}, true);
                 // i - insert before cursor (state change)
                 // I - insert beginning of line (state change)
                 // a - append after cursor
@@ -35,11 +68,3 @@ const stateMachine = createMachine({
                 // U - restore
                 // s - delete character substitute text (state change)
                 // S - delete line substitute text (state change)
-
-            },
-        },
-        insert:{},
-        visual:{},
-        replace:{}
-    }
-});
