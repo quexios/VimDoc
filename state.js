@@ -31,25 +31,28 @@ class stateMachine {
     // command list: https://vim.rtorr.com/
     handleNormalMode(key, event) {
         this.keyBuffer += key;
-
+        console.log('buffer: ' + this.keyBuffer.toString());
         // mode transitions
         if (key === 'i' || key === 'a') {
             event.preventDefault();
             this.transitionTo(states.INSERT);
             return;
         }
+        // key combinations should be intercepted here if more than one in buffer
+
+
         // individual keys
         switch (key) {
-            case 'j': console.log('down'); break;
-            case 'k': console.log('up'); break;
-            case 'h': console.log('left'); break;
-            case 'l': console.log('right'); break;
-            case 'w': console.log('jump forward start of word'); break;
-            case 'b': console.log('jump backward start of word'); break;
-            case '0': console.log('jump start of line'); break;
-            case '$': console.log('jump end of line'); break;
-            case '}': console.log('jump next paragraph'); break;
-            case '{': console.log('jump prev paragraph'); break;
+            case 'j': console.log('down'); this.clearBuffer();break;
+            case 'k': console.log('up'); this.clearBuffer();break;
+            case 'h': console.log('left'); this.clearBuffer();break;
+            case 'l': console.log('right'); this.clearBuffer();break;
+            case 'w': console.log('jump forward start of word'); this.clearBuffer();break;
+            case 'b': console.log('jump backward start of word'); this.clearBuffer();break;
+            case '0': console.log('jump start of line'); this.clearBuffer();break;
+            case '$': console.log('jump end of line'); this.clearBuffer();break;
+            case '}': console.log('jump next paragraph'); this.clearBuffer();break;
+            case '{': console.log('jump prev paragraph'); this.clearBuffer();break;
         }
 
         // in case for invalid combos
@@ -73,7 +76,7 @@ const vim = new stateMachine();
 
 window.addEventListener('keydown', (e)=> {
     // ignore key modifiers
-    if(e.key==='Shift'||e.key==='Control'||e.key==='Alt') return;
+    if(e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Tab') return;
     vim.handleKey(e);
 }, true);
                 // i - insert before cursor (state change)
