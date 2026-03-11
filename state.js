@@ -2,25 +2,60 @@
 // add event keypress mapper
 const states ={
     INSERT: 'Insert',
-    VISUAL: 'Visual',
+    //VISUAL: 'Visual',
     NORMAL: 'Normal'
 }
 
 class stateMachine {
     // initialize in normal mode, key buffer is user's key combinations
     constructor(){
-        this.mode = states.Normal;
+        this.mode = states.NORMAL;
         this.keyBuffer = '';
     }
 
     handleKey(event){
         const key = event.key;
         if(key==='Escape'){
-            this.transitionTo(states.Normal);
+            this.transitionTo(states.NORMAL);
             this.clearBuffer();
             return;
         }
+        switch (this.mode) {
+            case states.NORMAL:
+                console.log('-- NORMAL MODE --');
+                this.handleNormalMode(key, event);
+                break;
+        }
     }
+
+    // command list: https://vim.rtorr.com/
+    handleNormalMode(key, event) {
+        this.keyBuffer += key;
+
+        // mode transitions
+        if (key === 'i' || key === 'a') {
+            event.preventDefault();
+            this.transitionTo(states.INSERT);
+            return;
+        }
+        // individual keys
+        switch (key) {
+            case 'j': console.log('down'); break;
+            case 'k': console.log('up'); break;
+            case 'h': console.log('left'); break;
+            case 'l': console.log('right'); break;
+            case 'w': console.log('jump forward start of word'); break;
+            case 'b': console.log('jump backward start of word'); break;
+            case '0': console.log('jump start of line'); break;
+            case '$': console.log('jump end of line'); break;
+            case '}': console.log('jump next paragraph'); break;
+            case '{': console.log('jump prev paragraph'); break;
+        }
+
+        // in case for invalid combos
+        if (this.keyBuffer.length > 3) this.clearBuffer();
+    }
+
     transitionTo(newMode){
         if(this.mode!== newMode){
             this.mode = newMode;
