@@ -1,10 +1,22 @@
-
+// https://github.com/vim/vim/blob/master/src/README.md#the-main-loop
 // add event keypress mapper
+(() => {
+
+  if (window.__VIMDOC_LOADED__) return;
+  window.__VIMDOC_LOADED__ = true;
+
+
 const states ={
     INSERT: 'Insert',
     //VISUAL: 'Visual',
     NORMAL: 'Normal'
 }
+// https://developers.google.com/workspace/docs/api/reference/rest/v1/documents#paragraph
+let cursorPosition = 0;
+let docLength = 0;
+let startIndex = 0;
+let endIndex = 0;
+const docId = window.location.pathname.split('/d/')[1].split('/')[0];
 
 class stateMachine {
     // initialize in normal mode, key buffer is user's key combinations
@@ -16,7 +28,9 @@ class stateMachine {
     handleKey(event){
         const key = event.key;
         if(key==='Escape'){
+            console.log('-- NORMAL MODE --');
             this.transitionTo(states.NORMAL);
+            console.log('buffer: ' + this.keyBuffer.toString());
             this.clearBuffer();
             return;
         }
@@ -24,6 +38,10 @@ class stateMachine {
             case states.NORMAL:
                 console.log('-- NORMAL MODE --');
                 this.handleNormalMode(key, event);
+                break;
+            case states.INSERT:
+                console.log('-- INSERT MODE --');
+                this.handleInsertMode(key,event);
                 break;
         }
     }
@@ -43,10 +61,30 @@ class stateMachine {
 
         // individual keys
         switch (key) {
-            case 'j': console.log('down'); this.clearBuffer();break;
-            case 'k': console.log('up'); this.clearBuffer();break;
-            case 'h': console.log('left'); this.clearBuffer();break;
-            case 'l': console.log('right'); this.clearBuffer();break;
+            case 'j':
+                // https://stackoverflow.com/questions/78258654/replace-vertical-tabs-with-line-feeds
+                console.log('down');
+               // retrieve paragraph element start/end index, index difference from start index to the first \n character from text content is line length,
+               // subtract difference to cursor position
+
+                // let lineLength = text.indexOf('\n');
+                // if(cursorPosition - lineLength <= startIndex) cursorPosition -= lineLength;
+                this.clearBuffer();
+                break;
+            case 'k':
+                console.log('up');
+                this.clearBuffer();
+                break;
+            case 'h':
+                console.log('left');
+                if(cursorPosition > 0) cursorPosition--;
+                this.clearBuffer();
+                break;
+            case 'l':
+                console.log('right');
+                if(cursorPosition < docLength) cursorPosition++;
+                this.clearBuffer();
+                break;
             case 'w': console.log('jump forward start of word'); this.clearBuffer();break;
             case 'b': console.log('jump backward start of word'); this.clearBuffer();break;
             case '0': console.log('jump start of line'); this.clearBuffer();break;
@@ -57,6 +95,25 @@ class stateMachine {
 
         // in case for invalid combos
         if (this.keyBuffer.length > 3) this.clearBuffer();
+    }
+    handleInsertMode(key, event){
+        this.keyBuffer += key;
+        console.log('buffer: ' + this.keyBuffer.toString());
+        // mode transitions
+        if (key === 'Escape') {
+            event.preventDefault();
+            this.transitionTo(states.NORMAL);
+            return;
+        }
+        // key combinations should be intercepted here if more than one in buffer
+
+
+        // individual keys
+        switch (key) {
+
+        }
+
+
     }
 
     transitionTo(newMode){
@@ -73,12 +130,26 @@ class stateMachine {
 }
 
 const vim = new stateMachine();
+let isVimEnabled = true;
 
+chrome.storage.local.get({ enabled: true }, (data) => {
+  isVimEnabled = data.enabled;
+});
+
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && changes.enabled !== undefined) {
+      isVimEnabled = changes.enabled.newValue;
+
+      if (!isVimEnabled) {
+          vim.transitionTo(states.NORMAL);
+      }
+  }
+});
 window.addEventListener('keydown', (e)=> {
-    // ignore key modifiers
+    if (!isVimEnabled) return;
     if(e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Tab') return;
     vim.handleKey(e);
-}, true);
+}, true);})();
                 // i - insert before cursor (state change)
                 // I - insert beginning of line (state change)
                 // a - append after cursor
