@@ -2,10 +2,6 @@
 // add event keypress mapper
 (() => {
 
-  if (window.__VIMDOC_LOADED__) return;
-  window.__VIMDOC_LOADED__ = true;
-
-
 const states ={
     INSERT: 'Insert',
     //VISUAL: 'Visual',
@@ -18,10 +14,19 @@ let startIndex = 0;
 let endIndex = 0;
 const docId = window.location.pathname.split('/d/')[1].split('/')[0];
 
+// UI elements to inject
+const bar = document.createElement('div');
+bar.className='vim-sticky';
+let status = document.createElement('p');
+status.className='vim-style';
+bar.appendChild(status);
+document.body.appendChild(bar);
+
 class stateMachine {
     // initialize in normal mode, key buffer is user's key combinations
     constructor(){
         this.mode = states.NORMAL;
+        status.textContent=this.mode;
         this.keyBuffer = '';
     }
 
@@ -122,6 +127,7 @@ class stateMachine {
             this.clearBuffer();
 
             // TBA: UI should change here
+            status.textContent=this.mode;
         }
     }
     clearBuffer() {
