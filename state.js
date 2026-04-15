@@ -1,12 +1,32 @@
 // https://github.com/vim/vim/blob/master/src/README.md#the-main-loop
 // add event keypress mapper
-(() => {
 
+
+(() => {
+if (window.__VIMDOC_LOADED__) return;
+  window.__VIMDOC_LOADED__ = true;
+
+console.log('test');
 const states ={
     INSERT: 'Insert',
     //VISUAL: 'Visual',
     NORMAL: 'Normal'
 }
+
+// to send to simulate key event
+const keyCodes = {
+    backspace: 8,
+    enter: 13,
+    esc: 27,
+    end: 35,
+    home: 36,
+    left: 37,
+    up: 38,
+    right: 39,
+    down: 40,
+    "delete": 46,
+};
+
 // https://developers.google.com/workspace/docs/api/reference/rest/v1/documents#paragraph
 let cursorPosition = 0;
 let docLength = 0;
@@ -16,7 +36,7 @@ const docId = window.location.pathname.split('/d/')[1].split('/')[0];
 
 // UI elements to inject
 const bar = document.createElement('div');
-bar.className='vim-sticky';
+bar.className='vim-bar';
 let status = document.createElement('p');
 status.className='vim-style';
 bar.appendChild(status);
@@ -27,11 +47,17 @@ const script = document.createElement("script");
 script.src = chrome.runtime.getURL("page_script.js");
 document.documentElement.appendChild(script);
 
+function sendKeyEvent(key, mods = {}) {
+    const keyCode = keyCodes[key]
+    const defaultMods = { shift: false, control: false, alt: false, meta: false }
+    window.dispatchEvent(new CustomEvent("doc-keys-simulate-keypress", { detail: { keyCode, mods: { ...defaultMods, ...mods } } }));
+}
+
 class stateMachine {
     // initialize in normal mode, key buffer is user's key combinations
     constructor(){
         this.mode = states.NORMAL;
-        status.textContent=this.mode;
+        status.textContent=this.mode + ' ';
         this.keyBuffer = '';
     }
 
@@ -60,6 +86,7 @@ class stateMachine {
     handleNormalMode(key, event) {
         this.keyBuffer += key;
         console.log('buffer: ' + this.keyBuffer.toString());
+
         // mode transitions
         if (key === 'i' || key === 'a') {
             event.preventDefault();
@@ -67,13 +94,13 @@ class stateMachine {
             return;
         }
         // key combinations should be intercepted here if more than one in buffer
-
-
+        event.preventDefault();
         // individual keys
         switch (key) {
             case 'j':
                 // https://stackoverflow.com/questions/78258654/replace-vertical-tabs-with-line-feeds
                 console.log('down');
+                sendKeyEvent('down');
                // retrieve paragraph element start/end index, index difference from start index to the first \n character from text content is line length,
                // subtract difference to cursor position
 
@@ -83,15 +110,18 @@ class stateMachine {
                 break;
             case 'k':
                 console.log('up');
+                sendKeyEvent('up');
                 this.clearBuffer();
                 break;
             case 'h':
                 console.log('left');
+                sendKeyEvent('left');
                 if(cursorPosition > 0) cursorPosition--;
                 this.clearBuffer();
                 break;
             case 'l':
                 console.log('right');
+                sendKeyEvent('right');
                 if(cursorPosition < docLength) cursorPosition++;
                 this.clearBuffer();
                 break;
@@ -101,10 +131,14 @@ class stateMachine {
             case '$': console.log('jump end of line'); this.clearBuffer();break;
             case '}': console.log('jump next paragraph'); this.clearBuffer();break;
             case '{': console.log('jump prev paragraph'); this.clearBuffer();break;
+            default: status.textContent+=key;
         }
 
         // in case for invalid combos
-        if (this.keyBuffer.length > 3) this.clearBuffer();
+        if (this.keyBuffer.length > 3) {
+            this.clearBuffer();
+            status.textContent=this.mode + " ";
+        }
     }
     handleInsertMode(key, event){
         this.keyBuffer += key;
@@ -132,7 +166,7 @@ class stateMachine {
             this.clearBuffer();
 
             // TBA: UI should change here
-            status.textContent=this.mode;
+            status.textContent=this.mode + " ";
         }
     }
     clearBuffer() {

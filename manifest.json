@@ -4,7 +4,7 @@
 	"version":"1.1",
 	"manifest_version":3,
 	"background": {
-		"service-worker": "service-worker.js"
+		"service_worker": "service_worker.js"
 	},
 	"action": {
 		"default_popup": "index.html"
@@ -23,5 +23,15 @@
 	],
 	"host_permissions": [
 		"https://docs.google.com/*"
+	],
+	"web_accessible_resources": [
+		{
+			"resources": [
+				"page_script.js"
+			],
+			"matches": [
+				"https://docs.google.com/*"
+			]
+		}
 	]
 }
