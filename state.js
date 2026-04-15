@@ -22,6 +22,11 @@ status.className='vim-style';
 bar.appendChild(status);
 document.body.appendChild(bar);
 
+// keyboard events script inject
+const script = document.createElement("script");
+script.src = chrome.runtime.getURL("page_script.js");
+document.documentElement.appendChild(script);
+
 class stateMachine {
     // initialize in normal mode, key buffer is user's key combinations
     constructor(){
@@ -151,9 +156,12 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
       }
   }
 });
-window.addEventListener('keydown', (e)=> {
+// grab the google docs element frame to send events to
+const iframe = document.getElementsByTagName('iframe')[0];
+
+iframe.contentDocument.addEventListener('keydown', (e)=> {
     if (!isVimEnabled) return;
-    if(e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Tab') return;
+    if(e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Tab'||e.key==='Meta') return;
     vim.handleKey(e);
 }, true);})();
                 // i - insert before cursor (state change)
