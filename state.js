@@ -47,6 +47,14 @@ const script = document.createElement("script");
 script.src = chrome.runtime.getURL("page_script.js");
 document.documentElement.appendChild(script);
 
+function wordMods(shift = false) {
+    return { shift, [wordModifierKey]: true }
+}
+
+function paragraphMods(shift = false) {
+    return { shift, [paragraphModifierKey]: true }
+}
+
 function sendKeyEvent(key, mods = {}) {
     const keyCode = keyCodes[key]
     const defaultMods = { shift: false, control: false, alt: false, meta: false }
@@ -177,8 +185,10 @@ class stateMachine {
 const vim = new stateMachine();
 let isVimEnabled = true;
 
+
 chrome.storage.local.get({ enabled: true }, (data) => {
   isVimEnabled = data.enabled;
+  if(!isVimEnabled) bar.classList.add("hide");
 });
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -187,6 +197,9 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
       if (!isVimEnabled) {
           vim.transitionTo(states.NORMAL);
+          bar.classList.add("hide");
+      } else{
+          bar.classList.remove("hide");
       }
   }
 });
@@ -195,6 +208,7 @@ const iframe = document.getElementsByTagName('iframe')[0];
 
 iframe.contentDocument.addEventListener('keydown', (e)=> {
     if (!isVimEnabled) return;
+    bar.classList.remove("hide");
     if(e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Tab'||e.key==='Meta') return;
     vim.handleKey(e);
 }, true);})();
