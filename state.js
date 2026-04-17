@@ -1,16 +1,13 @@
 // https://github.com/vim/vim/blob/master/src/README.md#the-main-loop
-// add event keypress mapper
-
-
 (() => {
 if (window.__VIMDOC_LOADED__) return;
   window.__VIMDOC_LOADED__ = true;
 
-console.log('test');
 const states ={
     INSERT: 'Insert',
     //VISUAL: 'Visual',
-    NORMAL: 'Normal'
+    NORMAL: 'Normal',
+    MULTI: 'Multiple'
 }
 
 // to send to simulate key event
@@ -27,12 +24,17 @@ const keyCodes = {
     "delete": 46,
 };
 
+const isMac = /Mac/.test(navigator.platform || navigator.userAgent);
+const wordModifierKey = isMac ? 'alt' : 'control'
+const paragraphModifierKey = isMac ? 'alt' : 'control'
+
 // https://developers.google.com/workspace/docs/api/reference/rest/v1/documents#paragraph
 let cursorPosition = 0;
 let docLength = 0;
 let startIndex = 0;
 let endIndex = 0;
 const docId = window.location.pathname.split('/d/')[1].split('/')[0];
+
 
 // UI elements to inject
 const bar = document.createElement('div');
@@ -67,6 +69,7 @@ class stateMachine {
         this.mode = states.NORMAL;
         status.textContent=this.mode + ' ';
         this.keyBuffer = '';
+        this.multiKeys={ct:0, mode:states.NORMAL};
     }
 
     handleKey(event){
@@ -87,6 +90,11 @@ class stateMachine {
                 console.log('-- INSERT MODE --');
                 this.handleInsertMode(key,event);
                 break;
+            case states.MULTI:
+                console.log('-- MULTI MODE --')
+                this.handleMultiMode(key,event);
+                break;
+
         }
     }
 
@@ -95,14 +103,21 @@ class stateMachine {
         this.keyBuffer += key;
         console.log('buffer: ' + this.keyBuffer.toString());
 
+        event.preventDefault();
+        // repeated motion (3w, 2b, etc.)
+        if (/[0-9]/.test(key)) {
+            this.clearBuffer();
+            this.multiKeys.ct=Number(key);
+            this.multiKeys.mode=states.NORMAL;
+            this.transitionTo(states.MULTI);
+            return;
+        }
         // mode transitions
         if (key === 'i' || key === 'a') {
-            event.preventDefault();
             this.transitionTo(states.INSERT);
             return;
         }
         // key combinations should be intercepted here if more than one in buffer
-        event.preventDefault();
         // individual keys
         switch (key) {
             case 'j':
@@ -133,12 +148,45 @@ class stateMachine {
                 if(cursorPosition < docLength) cursorPosition++;
                 this.clearBuffer();
                 break;
-            case 'w': console.log('jump forward start of word'); this.clearBuffer();break;
-            case 'b': console.log('jump backward start of word'); this.clearBuffer();break;
-            case '0': console.log('jump start of line'); this.clearBuffer();break;
-            case '$': console.log('jump end of line'); this.clearBuffer();break;
-            case '}': console.log('jump next paragraph'); this.clearBuffer();break;
-            case '{': console.log('jump prev paragraph'); this.clearBuffer();break;
+            case 'w':
+                console.log('jump forward start of word');
+                sendKeyEvent("right", wordMods());
+                this.clearBuffer();
+                break;
+            case 'b':
+                console.log('jump backward start of word');
+                this.clearBuffer();
+               sendKeyEvent("left", wordMods());
+                break;
+            case '0':
+                console.log('jump start of line');
+                this.clearBuffer();
+                sendKeyEvent("home");
+                break;
+            case '$':
+                console.log('jump end of line');
+                sendKeyEvent("end");
+                this.clearBuffer();
+                break;
+            case '}':
+                console.log('jump next paragraph');
+                this.clearBuffer();
+                sendKeyEvent("down", paragraphMods(shift));
+                sendKeyEvent("right", {shift});
+                break;
+            case '{':
+                console.log('jump prev paragraph');
+                this.clearBuffer();
+                sendKeyEvent("up", paragraphMods(shift));
+                break;
+            case 'g':
+                sendKeyEvent("home", {control:true});
+                this.clearBuffer();
+                break;
+            case 'G':
+                sendKeyEvent("end", {control:true});
+                this.clearBuffer();
+                break;
             default: status.textContent+=key;
         }
 
@@ -167,6 +215,21 @@ class stateMachine {
 
 
     }
+    handleMultiMode(key, event){
+        event.preventDefault();
+        if (/[0-9]/.test(key)) {
+            // multi digit (e.g. 11, 222)
+            status.textContent+=key;
+            this.multiKeys.ct = Number(String(this.multiKeys.ct)+key);
+            return;
+        }
+        switch(this.multiKeys.mode){
+            case states.NORMAL:
+                this.repeat(key, this.multiKeys.ct, this.handleNormalMode, event);
+                break;
+        }
+        this.transitionTo(this.multiKeys.mode);
+    }
 
     transitionTo(newMode){
         if(this.mode!== newMode){
@@ -174,11 +237,24 @@ class stateMachine {
             this.clearBuffer();
 
             // TBA: UI should change here
-            status.textContent=this.mode + " ";
+            switch(this.mode){
+                case states.MULTI:
+                    status.textContent = this.multiKeys.mode +" "+ this.multiKeys.ct;
+                    break;
+                case states.NORMAL:
+                case states.INSERT:
+                   status.textContent=this.mode + " ";
+                   break;
+            }
+
         }
     }
     clearBuffer() {
         this.keyBuffer = '';
+    }
+
+    repeat(key, times, motion, event){
+        for(let i=0; i<times; i++) motion.call(this,key,event);
     }
 }
 
