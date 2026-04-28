@@ -5,7 +5,8 @@ if (window.__VIMDOC_LOADED__) return;
 
 const states ={
     INSERT: 'Insert',
-    //VISUAL: 'Visual',
+    VISUAL: 'Visual',
+    VISUALLINE: 'Visual Line',
     NORMAL: 'Normal',
     MULTI: 'Multiple'
 }
@@ -23,6 +24,18 @@ const keyCodes = {
     down: 40,
     "delete": 46,
 };
+
+let menuItemElements = {}
+
+let menuItems = {
+    copy: { parent: "Edit", caption: "Copy" },
+    cut: { parent: "Edit", caption: "Cut" },
+    paste: { parent: "Edit", caption: "Paste" },
+    redo: { parent: "Edit", caption: "Redo" },
+    undo: { parent: "Edit", caption: "Undo" },
+    find: { parent: "Edit", caption: "Find" }
+}
+
 
 const isMac = /Mac/.test(navigator.platform || navigator.userAgent);
 const wordModifierKey = isMac ? 'alt' : 'control'
@@ -70,6 +83,7 @@ class stateMachine {
         status.textContent=this.mode + ' ';
         this.keyBuffer = '';
         this.multiKeys={ct:0, mode:states.NORMAL};
+        this.longStringOp = "";
     }
 
     handleKey(event){
@@ -90,6 +104,14 @@ class stateMachine {
                 console.log('-- INSERT MODE --');
                 this.handleInsertMode(key,event);
                 break;
+            case states.VISUAL:
+                console.log('-- VISUAL MODE --');
+                this.handleVisualMode(key,event);
+                break;
+            case states.VISUALLINE:
+                console.log('-- VISUAL LINE --');
+                this.handleVisualLineMode(key,event);
+                break;
             case states.MULTI:
                 console.log('-- MULTI MODE --')
                 this.handleMultiMode(key,event);
@@ -102,7 +124,11 @@ class stateMachine {
     handleNormalMode(key, event) {
         this.keyBuffer += key;
         console.log('buffer: ' + this.keyBuffer.toString());
-
+        if (key === 'Escape') {
+            event.preventDefault();
+            this.clearBuffer();
+            return;
+        }
         event.preventDefault();
         // repeated motion (3w, 2b, etc.)
         if (/[0-9]/.test(key)) {
@@ -115,6 +141,14 @@ class stateMachine {
         // mode transitions
         if (key === 'i' || key === 'a') {
             this.transitionTo(states.INSERT);
+            return;
+        }
+        if(key==='v'){
+            this.transitionTo(states.VISUAL);
+            return;
+        }
+        if(key==='V'){
+            this.transitionTo(states.VISUALLINE);
             return;
         }
         // key combinations should be intercepted here if more than one in buffer
@@ -148,6 +182,7 @@ class stateMachine {
                 if(cursorPosition < docLength) cursorPosition++;
                 this.clearBuffer();
                 break;
+            case 'e':
             case 'w':
                 console.log('jump forward start of word');
                 sendKeyEvent("right", wordMods());
@@ -171,13 +206,52 @@ class stateMachine {
             case '}':
                 console.log('jump next paragraph');
                 this.clearBuffer();
-                sendKeyEvent("down", paragraphMods(shift));
-                sendKeyEvent("right", {shift});
+                sendKeyEvent("down", paragraphMods(false));
+                sendKeyEvent("right", {shift:false});
                 break;
             case '{':
                 console.log('jump prev paragraph');
                 this.clearBuffer();
-                sendKeyEvent("up", paragraphMods(shift));
+                sendKeyEvent("up", paragraphMods(false));
+                break;
+            case 'o':
+                sendKeyEvent('end');
+                sendKeyEvent("enter", { shift: true });
+                sendKeyEvent("enter", { shift: true });
+                sendKeyEvent('up');
+                this.clearBuffer();
+                this.transitionTo(states.INSERT);
+                break;
+            case 'O':
+                sendKeyEvent('home');
+                sendKeyEvent("enter", { shift: true });
+                sendKeyEvent("enter", { shift: true });
+                sendKeyEvent('up');
+                this.clearBuffer();
+                this.transitionTo(states.INSERT);
+                break;
+            case 'y':
+                longStringOp = key;
+                break;
+            case 'p':
+                this.clearBuffer();
+                this.clickMenu(menuItems.paste);
+                break
+            case 'u':
+                this.clearBuffer();
+                this.clickMenu(menuItems.undo);
+                break;
+            case 'r':
+                this.clearBuffer();
+                this.clickMenu(menuItems.redo);
+                break;
+            case '/':
+                this.clearBuffer();
+                this.clickMenu(menuItems.find);
+                break;
+            case 'x':
+                this.clearBuffer();
+                sendKeyEvent("delete");
                 break;
             case 'g':
                 sendKeyEvent("home", {control:true});
@@ -215,6 +289,110 @@ class stateMachine {
 
 
     }
+
+    handleVisualMode(key,event){
+        this.keyBuffer += key;
+        console.log('buffer: ' + this.keyBuffer.toString());
+       if (key === 'Escape') {
+           event.preventDefault();
+           this.transitionTo(states.NORMAL);
+           return;
+       }
+       event.preventDefault();
+        switch (key) {
+            case "w":
+                sendKeyEvent("left",{control:true})
+                sendKeyEvent("right", wordMods());
+                sendKeyEvent("right", wordMods(true));
+                break;
+            case "p":
+                sendKeyEvent("up", paragraphMods(true));
+                sendKeyEvent("down", paragraphMods(true));
+                sendKeyEvent("right", { shift:true });
+                break;
+        }
+        this.clearBuffer();
+        this.transitionTo(states.VISUALLINE);
+
+    }
+
+    handleVisualLineMode(key, event){
+        this.keyBuffer += key;
+        console.log('buffer: ' + this.keyBuffer.toString());
+
+        if (key === 'Escape') {
+           event.preventDefault();
+           this.transitionTo(states.NORMAL);
+           return;
+       }
+       event.preventDefault();
+        switch (key) {
+            case "":
+                break;
+            case "h":
+                sendKeyEvent("left", { shift: true });
+                break;
+            case "j":
+                sendKeyEvent("down", { shift: true });
+                break;
+            case "k":
+                sendKeyEvent("up", { shift: true });
+                break;
+            case "l":
+                sendKeyEvent("right", { shift: true });
+                break;
+            case "p":
+                clickMenu(menuItems.paste);
+                this.transitionTo(states.NORMAL);
+                break;
+            case "}":
+                sendKeyEvent("down", paragraphMods(true));
+                sendKeyEvent("right", { shift:true });
+                break;
+            case "{":
+                 sendKeyEvent("up", paragraphMods(true));
+                break;
+            case "b":
+                sendKeyEvent("left", wordMods(true));
+                break;
+            case "e":
+            case "w":
+                sendKeyEvent("right", wordMods(true));
+                break;
+            case "^":
+            case "_":
+            case "0":
+                sendKeyEvent("home",{shift:true});
+                break;
+            case "$":
+                sendKeyEvent("end",{shift:true});
+                break;
+            case "G":
+                if (isMac) {
+                    sendKeyEvent("down", { meta: true, shift:true });
+                } else {
+                    sendKeyEvent("end", { control: true, shift:true })
+                }
+                break;
+            case "g":
+                if (isMac) {
+                    sendKeyEvent("up", { meta: true, shift:true })
+                } else {
+                    sendKeyEvent("home", { control: true, shift:true })
+                }
+                break;
+            case "c":
+            case "d":
+            case "y":
+                runLongStringOp(key);
+                break
+            case "i":
+            case "a":
+                break;
+            }
+            this.clearBuffer();
+    }
+
     handleMultiMode(key, event){
         event.preventDefault();
         if (/[0-9]/.test(key)) {
@@ -242,6 +420,8 @@ class stateMachine {
                     status.textContent = this.multiKeys.mode +" "+ this.multiKeys.ct;
                     break;
                 case states.NORMAL:
+                case states.VISUAL:
+                case states.VISUALLINE:
                 case states.INSERT:
                    status.textContent=this.mode + " ";
                    break;
@@ -255,6 +435,138 @@ class stateMachine {
 
     repeat(key, times, motion, event){
         for(let i=0; i<times; i++) motion.call(this,key,event);
+    }
+
+    clickMenu(itemCaption) {
+        simulateClick(getMenuItem(itemCaption));
+    }
+
+    clickToolbarButton(captionList) {
+        // Sometimes a toolbar button won't exist in the DOM until its parent has been clicked, so we
+        // click all of its parents in sequence.
+        for (const caption of Array.from(captionList)) {
+            const els = document.querySelectorAll(`*[aria-label='${caption}']`);
+            if (els.length == 0) {
+                console.log(`Couldn't find the element for the button labeled ${caption}.`);
+                console.log(captionList);
+                return;
+            }
+            // Sometimes there are multiple elements that have the same label. When that happens, it's
+            // ambiguous which one to click, so we log it so it's easier to debug.
+            if (els.length > 1) {
+                console.log(
+                    `Warning: there are multiple buttons with the caption ${caption}. ` +
+                    "We're expecting only 1.",
+                );
+                console.log(captionList);
+            }
+            simulateClick(els[0]);
+        }
+    }
+    // Returns the DOM element of the menu item with the given caption. Prints a warning if a menu
+    // item isn't found (since this is a common source of errors in SheetKeys) unless silenceWarning
+    // is true.
+
+    getMenuItem(menuItem, silenceWarning = false) {
+        const caption = menuItem.caption;
+        let el = menuItemElements[caption];
+        if (el) return el;
+        el = findMenuItem(menuItem);
+        if (!el) {
+            if (!silenceWarning) console.error("Could not find menu item with caption", menuItem.caption);
+            return null;
+        }
+        return menuItemElements[caption] = el;
+    }
+
+    findMenuItem(menuItem) {
+        activateTopLevelMenu(menuItem.parent);
+        const menuItemEls = document.querySelectorAll(".goog-menuitem");
+        const caption = menuItem.caption;
+        const isRegexp = caption instanceof RegExp;
+        for (const el of Array.from(menuItemEls)) {
+            const label = el.innerText;
+            if (!label) continue;
+            if (isRegexp) {
+                if (caption.test(label)) {
+                    return el;
+                }
+            } else {
+                if (label.startsWith(caption)) {
+                    return el;
+                }
+            }
+        }
+        return null;
+    }
+
+    simulateClick(el, x = 0, y = 0) {
+        const eventSequence = ["mouseover", "mousedown", "mouseup", "click"];
+        for (const eventName of eventSequence) {
+            const event = document.createEvent("MouseEvents");
+            event.initMouseEvent(
+                eventName,
+                true, // bubbles
+                true, // cancelable
+                window, //view
+                1, // event-detail
+                x, // screenX
+                y, // screenY
+                x, // clientX
+                y, // clientY
+                false, // ctrl
+                false, // alt
+                false, // shift
+                false, // meta
+                0, // button
+                null, // relatedTarget
+            );
+            el.dispatchEvent(event);
+        }
+    }
+
+    activateTopLevelMenu(menuCaption) {
+        const buttons = Array.from(document.querySelectorAll(".menu-button"));
+        const button = buttons.find((el) => el.innerText.trim() == menuCaption);
+        if (!button) {
+            throw new Error(`Couldn't find top-level button with caption ${menuCaption}`);
+        }
+        // Unlike submenus, top-level menus can be hidden by clicking the button a second time to
+        // dismiss the menu.
+        simulateClick(button);
+        simulateClick(button);
+    }
+
+    runLongStringOp(operation = longStringOp) {
+        switch (operation) {
+            case "c":
+                clickMenu(menuItems.cut)
+                this.transitionTo(states.INSERT);
+                break
+            case "d":
+                clickMenu(menuItems.cut)
+                sendKeyEvent('backspace')
+                this.transitionTo(states.NORMAL);
+                break
+            case "y":
+                clickMenu(menuItems.copy);
+                this.transitionTo(states.NORMAL);
+                break
+            case "p":
+                clickMenu(menuItems.paste)
+                this.transitionTo(states.NORMAL);
+                break
+            case "v":
+                break
+            case "g":
+                if (isMac) {
+                    sendKeyEvent("up", { meta: true, shift:true })
+                } else {
+                    sendKeyEvent("home", { control: true, shift:true })
+                }
+                longStringOp="";
+                break;
+        }
     }
 }
 
