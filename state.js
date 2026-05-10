@@ -8,7 +8,9 @@ const states ={
     VISUAL: 'Visual',
     VISUALLINE: 'Visual Line',
     NORMAL: 'Normal',
-    MULTI: 'Multiple'
+    MULTI: 'Multiple',
+    COMBO: 'Combo',
+    COMBO2: 'Combo2'
 }
 
 // to send to simulate key event
@@ -113,8 +115,16 @@ class stateMachine {
                 this.handleVisualLineMode(key,event);
                 break;
             case states.MULTI:
-                console.log('-- MULTI MODE --')
+                console.log('-- MULTI MODE --');
                 this.handleMultiMode(key,event);
+                break;
+            case states.COMBO:
+                console.log('-- COMBO --');
+                this.handleCombo(key,event);
+                break;
+            case states.COMBO2:
+                console.log('-- COMBO2 --');
+                this.handleCombo2(key,event);
                 break;
 
         }
@@ -231,8 +241,9 @@ class stateMachine {
                 this.transitionTo(states.INSERT);
                 break;
             case 'y':
-                longStringOp = key;
-                break;
+                this.longStringOp = key;
+                this.transitionTo(states.COMBO);
+                return;
             case 'p':
                 this.clearBuffer();
                 this.clickMenu(menuItems.paste);
@@ -312,7 +323,10 @@ class stateMachine {
                 break;
         }
         this.clearBuffer();
-        this.transitionTo(states.VISUALLINE);
+        this.mode=states.VISUALLINE;
+        status.textContent=states.VISUALLINE + " ";
+        this.handleVisualLineMode(key,event);
+        //this.transitionTo(states.VISUALLINE);
 
     }
 
@@ -342,7 +356,7 @@ class stateMachine {
                 sendKeyEvent("right", { shift: true });
                 break;
             case "p":
-                clickMenu(menuItems.paste);
+                this.clickMenu(menuItems.paste);
                 this.transitionTo(states.NORMAL);
                 break;
             case "}":
@@ -384,13 +398,66 @@ class stateMachine {
             case "c":
             case "d":
             case "y":
-                runLongStringOp(key);
+                this.runLongStringOp(key);
                 break
             case "i":
             case "a":
                 break;
             }
             this.clearBuffer();
+    }
+    handleCombo(key,event){
+        event.preventDefault();
+        status.textContent+=key;
+        switch(key){
+           case "i":
+           case "a":
+               sendKeyEvent("left");
+               break;
+           case "w":
+               sendKeyEvent("right", wordMods(true));
+               this.runLongStringOp();
+               break;
+           case "p":
+               sendKeyEvent("down", paragraphMods(true));
+               this.runLongStringOp();
+               break;
+           case "^":
+           case "_":
+           case "0":
+               sendKeyEvent("home", {shift:true});
+               this.runLongStringOp();
+               break;
+           case "$":
+               sendKeyEvent("end", {shift:true});
+               this.runLongStringOp();
+               break;
+           case this.longStringOp:
+               // go to start of line, select to end of line
+               sendKeyEvent("home");
+               sendKeyEvent("end", {shift:true});
+               this.runLongStringOp();
+               break
+           default:
+               this.transitionTo(states.NORMAL);
+        }
+    }
+
+    handleCombo2(key,event){
+        event.preventDefault();
+        switch (key) {
+            case "w":
+                sendKeyEvent("left",wordMods());
+                this.handleCombo(key);
+                break;
+            case "p":
+                sendKeyEvent("up",paragraphMods(false));
+                this.handleCombo(key);
+                break;
+            default:
+                this.transitionTo(states.NORMAL);
+                break;
+        }
     }
 
     handleMultiMode(key, event){
@@ -411,6 +478,7 @@ class stateMachine {
 
     transitionTo(newMode){
         if(this.mode!== newMode){
+            let oldMode = this.mode;
             this.mode = newMode;
             this.clearBuffer();
 
@@ -420,8 +488,14 @@ class stateMachine {
                     status.textContent = this.multiKeys.mode +" "+ this.multiKeys.ct;
                     break;
                 case states.NORMAL:
+                    if(oldMode == states.VISUALLINE || oldMode == states.COMBO){
+                        sendKeyEvent("left");
+                    }
+                    status.textContent=this.mode + " ";
+                    break;
                 case states.VISUAL:
                 case states.VISUALLINE:
+                case states.COMBO:
                 case states.INSERT:
                    status.textContent=this.mode + " ";
                    break;
@@ -438,7 +512,7 @@ class stateMachine {
     }
 
     clickMenu(itemCaption) {
-        simulateClick(getMenuItem(itemCaption));
+        this.simulateClick(this.getMenuItem(itemCaption));
     }
 
     clickToolbarButton(captionList) {
@@ -460,7 +534,7 @@ class stateMachine {
                 );
                 console.log(captionList);
             }
-            simulateClick(els[0]);
+            this.simulateClick(els[0]);
         }
     }
     // Returns the DOM element of the menu item with the given caption. Prints a warning if a menu
@@ -471,7 +545,7 @@ class stateMachine {
         const caption = menuItem.caption;
         let el = menuItemElements[caption];
         if (el) return el;
-        el = findMenuItem(menuItem);
+        el = this.findMenuItem(menuItem);
         if (!el) {
             if (!silenceWarning) console.error("Could not find menu item with caption", menuItem.caption);
             return null;
@@ -480,7 +554,7 @@ class stateMachine {
     }
 
     findMenuItem(menuItem) {
-        activateTopLevelMenu(menuItem.parent);
+        this.activateTopLevelMenu(menuItem.parent);
         const menuItemEls = document.querySelectorAll(".goog-menuitem");
         const caption = menuItem.caption;
         const isRegexp = caption instanceof RegExp;
@@ -533,27 +607,27 @@ class stateMachine {
         }
         // Unlike submenus, top-level menus can be hidden by clicking the button a second time to
         // dismiss the menu.
-        simulateClick(button);
-        simulateClick(button);
+        this.simulateClick(button);
+        this.simulateClick(button);
     }
 
-    runLongStringOp(operation = longStringOp) {
+    runLongStringOp(operation = this.longStringOp) {
         switch (operation) {
             case "c":
-                clickMenu(menuItems.cut)
+                this.clickMenu(menuItems.cut)
                 this.transitionTo(states.INSERT);
                 break
             case "d":
-                clickMenu(menuItems.cut)
+                this.clickMenu(menuItems.cut)
                 sendKeyEvent('backspace')
                 this.transitionTo(states.NORMAL);
                 break
             case "y":
-                clickMenu(menuItems.copy);
+                this.clickMenu(menuItems.copy);
                 this.transitionTo(states.NORMAL);
                 break
             case "p":
-                clickMenu(menuItems.paste)
+                this.clickMenu(menuItems.paste)
                 this.transitionTo(states.NORMAL);
                 break
             case "v":
@@ -564,7 +638,7 @@ class stateMachine {
                 } else {
                     sendKeyEvent("home", { control: true, shift:true })
                 }
-                longStringOp="";
+                this.longStringOp="";
                 break;
         }
     }

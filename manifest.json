@@ -15,11 +15,9 @@
 		"scopes":["https://www.googleapis.com/auth/documents"]
 	},
 	"permissions": [
-		"identity",
 		"scripting",
 		"storage",
-		"activeTab",
-		"tabs"
+		"activeTab"
 	],
 	"host_permissions": [
 		"https://docs.google.com/*"
